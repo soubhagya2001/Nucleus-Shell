@@ -14,18 +14,18 @@ A minimal shell implemented in Node.js as part of the [Codecrafters](https://cod
 ### Installation (via `npm link`)
 
 ```bash
-git clone https://github.com/your-username/codecrafters-shell-javascript
-cd codecrafters-shell-javascript
+git clone https://github.com/soubhagya2001/Shell-NodeJs
+cd Shell-NodeJs
 npm link
 ```
 
 Then run your shell:
 
 ```bash
-my-shell
+myshell
 ```
 
-> `my-shell` is the command name defined in `package.json`'s `"bin"` field.
+> `myshell` is the command name defined in `package.json`'s `"bin"` field.
 
 ---
 
