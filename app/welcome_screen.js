@@ -1,7 +1,6 @@
-// app/welcome_screen.js
-async function printWelcomeMessage() {
-  const chalk = await import("chalk");
+import chalk from "chalk";
 
+export default async function printWelcomeMessage() {
   console.clear();
 
   const banner = `
@@ -12,11 +11,8 @@ async function printWelcomeMessage() {
 [+] Environment loaded
 [+] Awaiting your command, Operator 🧠
 
-
-  ${chalk.default.cyanBright("Welcome to Codecrafters Shell! 🚀")}
+  ${chalk.cyanBright("Welcome to Codecrafters Shell! 🚀")}
   `;
 
-  console.log(chalk.default.greenBright(banner));
+  console.log(chalk.greenBright(banner));
 }
-
-module.exports = printWelcomeMessage;
