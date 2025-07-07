@@ -4,6 +4,7 @@ const readline = require("node:readline");
 const fs = require("node:fs");
 const { spawnSync, spawn } = require("child_process");
 const path = require("node:path");
+// const { printWelcomeMessage } = require('./welcome_screen');
 
 const historyList = [];
 let lastHistoryWriteIndex = 0;
@@ -472,4 +473,10 @@ function repl() {
   });
 }
 
-repl();
+
+const printWelcomeMessage = require("./welcome_screen");
+
+(async () => {
+  await printWelcomeMessage(); // ✅ NO SYNTAX ERROR inside async IIFE
+  repl(); // ✅ Start the shell REPL
+})();

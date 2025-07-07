@@ -14,5 +14,7 @@
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {}
+  "dependencies": {
+    "chalk": "^5.4.1"
+  }
 }
