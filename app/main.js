@@ -218,18 +218,38 @@ const commands = {
 
   pwd: () => console.log(process.cwd()),
 
-  cd: (targetPath) => {
+  cd: (...targetParts) => {
+    // 1. Join all arguments to re-create the full path, including spaces.
+    let targetPath = targetParts.join(" ");
+
+    // 2. Handle the 'cd' command with no arguments (go to home directory).
+    // This is standard behavior for shells like bash.
     if (!targetPath || targetPath.trim() === "") {
-      targetPath = process.env.HOME || process.env.USERPROFILE;
+      targetPath = process.env.HOME || process.env.USERPROFILE; // USERPROFILE for Windows
     }
+
+    // 3. Handle the tilde '~' for the home directory.
     if (targetPath === "~") {
       targetPath = process.env.HOME || process.env.USERPROFILE;
     }
+
+    // Check if a target path is actually available after processing.
+    if (!targetPath) {
+      console.log(chalk.red("cd: HOME directory not set."));
+      return;
+    }
+
+    // 4. Resolve the path relative to the current directory and attempt to change to it.
     const resolvedPath = path.resolve(process.cwd(), targetPath);
     try {
       process.chdir(resolvedPath);
     } catch (err) {
-      console.log(`cd: ${targetPath}: No such file or directory`);
+      // Provide a more helpful error message.
+      if (err.code === "ENOENT") {
+        console.log(`cd: ${targetPath}: No such file or directory`);
+      } else {
+        console.log(`cd: Error changing directory: ${err.message}`);
+      }
     }
   },
 
