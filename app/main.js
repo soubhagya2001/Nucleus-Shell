@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 
-const readline = require("node:readline");
-const fs = require("node:fs");
-const { spawnSync, spawn } = require("child_process");
-const path = require("node:path");
+import readline from "node:readline";
+import fs from "node:fs";
+import { spawnSync, spawn } from "child_process";
+import path from "node:path";
+import { GeminiClient } from "./geminiClient.js"; // <-- Important to include .js extension
+import printWelcomeMessage from "./welcome_screen.js"; // ✅ this now works
+import chalk from "chalk";
+import boxen from "boxen";
+import { formatMarkdownToChalk } from "./helper.js";
+import printHelpScreen from "./help_screen.js";
+const geminiClient = new GeminiClient("gemini-2.5-flash");
+
 // const { printWelcomeMessage } = require('./welcome_screen');
 
 const historyList = [];
@@ -256,7 +264,76 @@ const commands = {
       console.log(`${start + idx + 1}  ${cmd}`);
     });
   },
+  gemini: async (...args) => {
+    const prompt = args.join(" ").trim();
+    if (!prompt) return console.log(chalk.yellow("Usage: gemini <question>"));
+
+    const spinnerText = chalk.blueBright("🤖 Gemini is thinking...");
+    console.log(spinnerText);
+
+    const res = await geminiClient.ask(prompt);
+
+    // Clear just the "Thinking..." line
+    readline.moveCursor(process.stdout, 0, -1); // Move cursor up
+    readline.clearLine(process.stdout, 0); // Clear the line
+    readline.cursorTo(process.stdout, 0);
+    const formatted = formatMarkdownToChalk(res);
+
+    const decorated = boxen(formatted, {
+      padding: 1,
+      borderColor: "green",
+      borderStyle: "round",
+      title: chalk.green("Gemini AI Response"),
+      titleAlignment: "center",
+    });
+
+    // console.clear(); // Optional: clear prompt line
+    console.log(decorated);
+  },
+  ps: (...args) => {
+    const psCommand = args.join(" ").trim();
+    if (!psCommand) {
+      console.error("Usage: ps <PowerShell command>");
+      return;
+    }
+
+    const pwsh =
+      getAbsPath("pwsh") || getAbsPath("powershell") || "powershell.exe";
+
+    if (!pwsh) {
+      console.error("PowerShell is not available on this system.");
+      return;
+    }
+
+    try {
+      spawnSync(pwsh, ["-Command", psCommand], {
+        stdio: "inherit",
+      });
+    } catch (e) {
+      console.error(`PowerShell error: ${e.message}`);
+    }
+  },
+
+  cmd : (...args) => {
+  if (args.length === 0) {
+    return console.log("Usage: cmd <Windows CMD command>");
+  }
+
+  const input = args.join(" ");
+  const cmdExe = getAbsPath("cmd") || "cmd.exe";
+
+  if (!cmdExe) {
+    return console.error("CMD not found in PATH.");
+  }
+
+  const child = spawnSync(cmdExe, ["/C", input], { stdio: "inherit" });
+
+  if (child.error) {
+    console.error("CMD error:", child.error.message);
+  }
+}
 };
+commands.ai = commands.gemini; // alias for user convenience
 
 function safeRepl() {
   if (!rl.closed) {
@@ -376,7 +453,7 @@ function repl() {
     input = input.replace(/\r?\n/g, "").trim();
     if (!input) return safeRepl();
 
-    historyList.push(input); // ✅ <-- Track command in history
+    historyList.push(input); // ✅ Track command in history
 
     if (input.includes("|")) {
       handlePipeline(input);
@@ -414,6 +491,11 @@ function repl() {
     const command = args[0];
     if (!command) return safeRepl();
 
+    if (command === "help" || command === "--help" || args.includes("--help")) {
+      printHelpScreen();
+      return safeRepl();
+    }
+
     const originalStdout = process.stdout.write;
     const originalStderr = process.stderr.write;
 
@@ -424,6 +506,7 @@ function repl() {
         });
         process.stdout.write = outStream.write.bind(outStream);
       }
+
       if (stderrRedirect) {
         const errStream = fs.createWriteStream(stderrRedirect.path, {
           flags: stderrRedirect.flags,
@@ -432,7 +515,15 @@ function repl() {
       }
 
       try {
-        commands[command](...args.slice(1));
+        const result = commands[command](...args.slice(1));
+        if (result instanceof Promise) {
+          result.then(() => {
+            process.stdout.write = originalStdout;
+            process.stderr.write = originalStderr;
+            safeRepl();
+          });
+          return;
+        }
       } catch (e) {
         console.error(e.message);
       }
@@ -442,22 +533,23 @@ function repl() {
       return safeRepl();
     }
 
-    const stdio = ["inherit", "inherit", "inherit"];
-    const fdsToClose = [];
+    const binaryPath = getAbsPath(command);
+    if (binaryPath) {
+      const stdio = ["inherit", "inherit", "inherit"];
+      const fdsToClose = [];
 
-    if (stdoutRedirect) {
-      const fd = fs.openSync(stdoutRedirect.path, stdoutRedirect.flags);
-      stdio[1] = fd;
-      fdsToClose.push(fd);
-    }
+      if (stdoutRedirect) {
+        const fd = fs.openSync(stdoutRedirect.path, stdoutRedirect.flags);
+        stdio[1] = fd;
+        fdsToClose.push(fd);
+      }
 
-    if (stderrRedirect) {
-      const fd = fs.openSync(stderrRedirect.path, stderrRedirect.flags);
-      stdio[2] = fd;
-      fdsToClose.push(fd);
-    }
+      if (stderrRedirect) {
+        const fd = fs.openSync(stderrRedirect.path, stderrRedirect.flags);
+        stdio[2] = fd;
+        fdsToClose.push(fd);
+      }
 
-    if (getAbsPath(command)) {
       try {
         spawnSync(command, args.slice(1), { stdio });
       } catch (e) {
@@ -466,7 +558,7 @@ function repl() {
         fdsToClose.forEach(fs.closeSync);
       }
     } else {
-      console.error(`${command}: command not found`);
+      console.error(`${command}: Invalid command`);
     }
 
     safeRepl();
@@ -474,9 +566,16 @@ function repl() {
 }
 
 
-const printWelcomeMessage = require("./welcome_screen");
+
+
 
 (async () => {
-  await printWelcomeMessage(); // ✅ NO SYNTAX ERROR inside async IIFE
-  repl(); // ✅ Start the shell REPL
+  await printWelcomeMessage(); 
+
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(false); // ✅ allow paste support
+  }
+
+  repl(); 
 })();
