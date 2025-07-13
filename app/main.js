@@ -558,7 +558,6 @@ function repl() {
         fdsToClose.forEach(fs.closeSync);
       }
     } else {
-      // ❌ No fallback to PowerShell
       console.error(`${command}: Invalid command`);
     }
 
@@ -571,6 +570,12 @@ function repl() {
 
 
 (async () => {
-  await printWelcomeMessage(); // ✅ NO SYNTAX ERROR inside async IIFE
-  repl(); // ✅ Start the shell REPL
+  await printWelcomeMessage(); 
+
+  readline.emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(false); // ✅ allow paste support
+  }
+
+  repl(); 
 })();
