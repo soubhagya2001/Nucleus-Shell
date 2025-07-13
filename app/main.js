@@ -401,7 +401,7 @@ const commands = {
               padding: 1,
               borderColor: "cyan",
               borderStyle: "round",
-              title: chalk.cyan("Gemini Final Answer"),
+              title: chalk.cyan("Gemini Replies"),
             });
             console.log(decorated);
             return;
