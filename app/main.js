@@ -289,7 +289,49 @@ const commands = {
 
     // console.clear(); // Optional: clear prompt line
     console.log(decorated);
+  },
+  ps: (...args) => {
+    const psCommand = args.join(" ").trim();
+    if (!psCommand) {
+      console.error("Usage: ps <PowerShell command>");
+      return;
+    }
+
+    const pwsh =
+      getAbsPath("pwsh") || getAbsPath("powershell") || "powershell.exe";
+
+    if (!pwsh) {
+      console.error("PowerShell is not available on this system.");
+      return;
+    }
+
+    try {
+      spawnSync(pwsh, ["-Command", psCommand], {
+        stdio: "inherit",
+      });
+    } catch (e) {
+      console.error(`PowerShell error: ${e.message}`);
+    }
+  },
+
+  cmd : (...args) => {
+  if (args.length === 0) {
+    return console.log("Usage: cmd <Windows CMD command>");
   }
+
+  const input = args.join(" ");
+  const cmdExe = getAbsPath("cmd") || "cmd.exe";
+
+  if (!cmdExe) {
+    return console.error("CMD not found in PATH.");
+  }
+
+  const child = spawnSync(cmdExe, ["/C", input], { stdio: "inherit" });
+
+  if (child.error) {
+    console.error("CMD error:", child.error.message);
+  }
+}
 };
 commands.ai = commands.gemini; // alias for user convenience
 
@@ -411,7 +453,7 @@ function repl() {
     input = input.replace(/\r?\n/g, "").trim();
     if (!input) return safeRepl();
 
-    historyList.push(input); // ✅ <-- Track command in history
+    historyList.push(input); // ✅ Track command in history
 
     if (input.includes("|")) {
       handlePipeline(input);
@@ -448,6 +490,7 @@ function repl() {
     const args = parseArgs(input);
     const command = args[0];
     if (!command) return safeRepl();
+
     if (command === "help" || command === "--help" || args.includes("--help")) {
       printHelpScreen();
       return safeRepl();
@@ -463,6 +506,7 @@ function repl() {
         });
         process.stdout.write = outStream.write.bind(outStream);
       }
+
       if (stderrRedirect) {
         const errStream = fs.createWriteStream(stderrRedirect.path, {
           flags: stderrRedirect.flags,
@@ -483,58 +527,45 @@ function repl() {
       } catch (e) {
         console.error(e.message);
       }
+
       process.stdout.write = originalStdout;
       process.stderr.write = originalStderr;
       return safeRepl();
-
     }
 
-    const stdio = ["inherit", "inherit", "inherit"];
-    const fdsToClose = [];
+    const binaryPath = getAbsPath(command);
+    if (binaryPath) {
+      const stdio = ["inherit", "inherit", "inherit"];
+      const fdsToClose = [];
 
-    if (stdoutRedirect) {
-      const fd = fs.openSync(stdoutRedirect.path, stdoutRedirect.flags);
-      stdio[1] = fd;
-      fdsToClose.push(fd);
+      if (stdoutRedirect) {
+        const fd = fs.openSync(stdoutRedirect.path, stdoutRedirect.flags);
+        stdio[1] = fd;
+        fdsToClose.push(fd);
+      }
+
+      if (stderrRedirect) {
+        const fd = fs.openSync(stderrRedirect.path, stderrRedirect.flags);
+        stdio[2] = fd;
+        fdsToClose.push(fd);
+      }
+
+      try {
+        spawnSync(command, args.slice(1), { stdio });
+      } catch (e) {
+        console.error(e.message);
+      } finally {
+        fdsToClose.forEach(fs.closeSync);
+      }
+    } else {
+      // ❌ No fallback to PowerShell
+      console.error(`${command}: Invalid command`);
     }
-
-    if (stderrRedirect) {
-      const fd = fs.openSync(stderrRedirect.path, stderrRedirect.flags);
-      stdio[2] = fd;
-      fdsToClose.push(fd);
-    }
-
-        const binaryPath = getAbsPath(command);
-        if (binaryPath) {
-          try {
-            spawnSync(command, args.slice(1), { stdio });
-          } catch (e) {
-            console.error(e.message);
-          } finally {
-            fdsToClose.forEach(fs.closeSync);
-          }
-        } else {
-          // Attempt fallback using PowerShell if available
-          const pwsh =
-            getAbsPath("pwsh") || getAbsPath("powershell") || "powershell.exe";
-          if (pwsh) {
-            try {
-              spawnSync(pwsh, ["-Command", input], { stdio });
-            } catch (e) {
-              console.error(`PowerShell error: ${e.message}`);
-            } finally {
-              fdsToClose.forEach(fs.closeSync);
-            }
-          } else {
-            console.error(`${command}: command not found`);
-          }
-        }
-
-
 
     safeRepl();
   });
 }
+
 
 
 
