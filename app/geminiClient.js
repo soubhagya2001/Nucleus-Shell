@@ -1,5 +1,4 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import "dotenv/config.js";
 import chalk from "chalk";
 import { exec } from "node:child_process";
 import util from "node:util";
@@ -24,11 +23,16 @@ Available Tools:
 `;
 
 export class GeminiClient {
-  constructor(modelName) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("Missing GEMINI_API_KEY environment variable.");
+  constructor(apiKey, modelName) {
+    if (!apiKey) {
+      // This is a programming error, not a user error.
+      throw new Error("GeminiClient constructor requires an API key.");
     }
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    if (!modelName) {
+      throw new Error("GeminiClient constructor requires a model name.");
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
 
     this.model = genAI.getGenerativeModel({
       model: modelName,
@@ -44,6 +48,32 @@ export class GeminiClient {
     this.chat = this.model.startChat({ history: [] });
   }
 
+  /**
+   * Statically checks if a model name is valid by attempting a real API call.
+   * @param {string} apiKey - The user's Gemini API key.
+   * @param {string} modelName - The name of the model to validate.
+   * @returns {Promise<boolean>} - True if the model is valid, false otherwise.
+   */
+  static async validateModel(apiKey, modelName) {
+    if (!apiKey || !modelName) return false;
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // THIS IS THE CRUCIAL CHANGE.
+      // getGenerativeModel() is lazy. We must perform a real, lightweight
+      // operation like countTokens() to force an API call and truly
+      // confirm the model exists and is accessible.
+      await model.countTokens("validate"); // Send a dummy string.
+
+      return true; // If countTokens() doesn't throw, the model is valid.
+    } catch (error) {
+      // This will now correctly catch errors for invalid model names like "test".
+      // The API will throw an error, which we catch here.
+      return false;
+    }
+  }
+
   async converse(message) {
     const result = await this.chat.sendMessage(message);
     const responseText = result.response.text();
@@ -56,7 +86,6 @@ export class GeminiClient {
       );
     }
   }
-
 
   async runShellCommand(command) {
     console.log(chalk.blue(`  [Tool Executing] runCommand: ${command}`));

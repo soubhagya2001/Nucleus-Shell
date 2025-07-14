@@ -2,6 +2,7 @@
 
 import readline from "node:readline";
 import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import { spawnSync, spawn } from "child_process";
 import path from "node:path";
 import { GeminiClient } from "./geminiClient.js";
@@ -10,9 +11,19 @@ import chalk from "chalk";
 import boxen from "boxen";
 import { formatMarkdownToChalk } from "./helper.js";
 import printHelpScreen from "./help_screen.js";
-
+import { getConfig, setConfig } from "./configManager.js";
+import "dotenv/config.js";
 // Use a modern model that is good for chat and supports JSON mode reliably.
-const geminiClient = new GeminiClient("gemini-1.5-flash-latest");
+// const geminiClient = new GeminiClient("gemini-1.5-flash-latest");
+
+// ✅ On startup, check for the API key from the environment and exit if not found.
+const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.error(chalk.red("\n[FATAL ERROR] GEMINI_API_KEY not found in .env file."));
+  console.error(chalk.yellow("The application cannot start. Please create a .env file and add your key."));
+  process.exit(1);
+}
+
 
 const historyList = [];
 let lastHistoryWriteIndex = 0;
@@ -180,6 +191,137 @@ function handlePipeline(input) {
 }
 
 const commands = {
+  // main.js - inside the 'commands' object
+
+  config: async (subcommand, ...args) => {
+    // --- Case 1: Handle 'get' ---
+    if (subcommand === "get") {
+      // ... (this part is unchanged)
+      const key = args[0];
+      if (key && key !== "model") {
+        console.log(
+          chalk.red(`Invalid argument for 'get'. You can only get the model.`)
+        );
+        console.log(chalk.yellow("Usage: config get"));
+        return;
+      }
+      const currentConfig = getConfig();
+      console.log(`Current Model: ${currentConfig.model}`);
+      return;
+    }
+
+    // --- Case 2: Handle 'set' ---
+    if (subcommand === "set") {
+      // ... (this part is unchanged)
+      const key = args[0];
+      const modelName = args.slice(1).join(" ");
+      if (key !== "model") {
+        console.log(
+          chalk.red(
+            "Invalid key. You can only set 'model'. Usage: config set model <model_name>"
+          )
+        );
+        return;
+      }
+      if (!modelName) {
+        console.log(
+          chalk.red(
+            "Error: Missing model name. Usage: config set model <model_name>"
+          )
+        );
+        return;
+      }
+      console.log(
+        chalk.yellow(`Validating model '${modelName}' with Google...`)
+      );
+      const isValid = await GeminiClient.validateModel(apiKey, modelName);
+      if (!isValid) {
+        console.log(chalk.red.bold(`\nValidation Failed!`));
+        console.log(
+          chalk.red(
+            `Error: Model '${modelName}' is not a valid or accessible Gemini model.`
+          )
+        );
+        console.log(
+          chalk.yellow(
+            "To see a list of available models, run: config list models"
+          )
+        );
+        return;
+      }
+      console.log(chalk.green(`\nModel '${modelName}' is valid.`));
+      setConfig("model", modelName);
+      return;
+    }
+
+    // =================================================================
+    // REWRITTEN SUBCOMMAND FOR LISTING MODELS FROM LOCAL FILE
+    // =================================================================
+    if (subcommand === "list") {
+      const listType = args[0];
+      if (listType !== "models") {
+        console.log(
+          chalk.red(`Invalid argument for 'list'. You can only list 'models'.`)
+        );
+        console.log(chalk.yellow("Usage: config list models"));
+        return;
+      }
+
+      try {
+        // Correctly locate models.json relative to this script file
+        const __dirname = path.dirname(fileURLToPath(import.meta.url));
+        const modelsFilePath = path.join(__dirname, "models.json");
+
+        const fileContent = fs.readFileSync(modelsFilePath, "utf8");
+        const models = JSON.parse(fileContent);
+
+        if (!models || models.length === 0) {
+          console.log(
+            chalk.yellow("Model list is empty or file is corrupted.")
+          );
+          return;
+        }
+
+        console.log(
+          chalk.green.bold("\nAvailable Gemini Models (Recommended):")
+        );
+        models.forEach((model) => {
+          console.log(`  - ${chalk.cyan(model.name)}`);
+          console.log(`    ${chalk.gray(model.description)}`);
+        });
+        console.log(
+          chalk.gray(
+            "\nUse 'config set model <model_name>' to set your preferred model."
+          )
+        );
+      } catch (error) {
+        console.error(
+          chalk.red("\nError: Could not read the local 'models.json' file.")
+        );
+        console.error(chalk.gray(error.message));
+      }
+      return;
+    }
+    // =================================================================
+    // END OF REWRITTEN SUBCOMMAND
+    // =================================================================
+
+    // --- Default Case: Show help ---
+    console.log(chalk.yellow.bold("\nConfig Command Usage:"));
+    console.log(
+      "  config get                     - View the currently set model."
+    );
+    console.log(
+      "  config set model <model_name>  - Set your default AI model."
+    );
+    console.log(
+      "  config list models             - Show recommended AI models and their capabilities."
+    );
+    console.log(
+      chalk.gray("\n  (Your API key is loaded securely from the .env file)")
+    );
+  },
+
   exit: (code) => {
     if (process.env.HISTFILE) {
       try {
@@ -324,6 +466,10 @@ const commands = {
   },
 
   gemini: async (...args) => {
+    const config = getConfig();
+
+    const geminiClient = new GeminiClient(apiKey, config.model);
+
     const prompt = args.join(" ").trim();
     if (!prompt) {
       console.log(chalk.yellow("Usage: gemini <question>"));
@@ -503,7 +649,7 @@ function parseArgs(input) {
   // This regex handles spaces, single quotes, double quotes, and escaped quotes.
   return (
     input.match(/(".*?"|'.*?'|\S+)/g)?.map((arg) => {
-      // Remove quotes from the start and end of the argument
+      
       if (
         (arg.startsWith('"') && arg.endsWith('"')) ||
         (arg.startsWith("'") && arg.endsWith("'"))
@@ -589,24 +735,36 @@ function repl() {
   });
 }
 
+// (async () => {
+//   await printWelcomeMessage();
+
+//   readline.emitKeypressEvents(process.stdin);
+//   if (process.stdin.isTTY) {
+//     process.stdin.setRawMode(true);
+//   }
+
+//   rl.on("SIGINT", () => {
+//     console.log("^C");
+//     repl();
+//   });
+
+//   process.stdin.on("keypress", (str, key) => {
+//     if (process.stdin.isTTY) {
+//       process.stdin.setRawMode(true);
+//     }
+//   });
+
+//   repl();
+// })();
+
 (async () => {
   await printWelcomeMessage();
 
-  readline.emitKeypressEvents(process.stdin);
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true);
-  }
-
+  // Handle Ctrl+C gracefully to exit the shell
   rl.on("SIGINT", () => {
-    console.log("^C");
-    repl();
+    commands.exit();
   });
 
-  process.stdin.on("keypress", (str, key) => {
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(true);
-    }
-  });
-
+  // Start the main application loop
   repl();
 })();
