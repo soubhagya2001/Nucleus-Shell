@@ -12,8 +12,15 @@ import boxen from "boxen";
 import { formatMarkdownToChalk } from "./helper.js";
 import printHelpScreen from "./help_screen.js";
 import { getConfig, setConfig } from "./configManager.js";
-import "dotenv/config.js";
-// Use a modern model that is good for chat and supports JSON mode reliably.
+
+import dotenv from "dotenv";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const envPath = path.join(__dirname, "..", ".env");
+
+// Load the .env file from that specific path
+dotenv.config({ path: envPath });
+
 // const geminiClient = new GeminiClient("gemini-1.5-flash-latest");
 
 // ✅ On startup, check for the API key from the environment and exit if not found.
@@ -196,7 +203,6 @@ const commands = {
   config: async (subcommand, ...args) => {
     // --- Case 1: Handle 'get' ---
     if (subcommand === "get") {
-      // ... (this part is unchanged)
       const key = args[0];
       if (key && key !== "model") {
         console.log(
@@ -212,7 +218,6 @@ const commands = {
 
     // --- Case 2: Handle 'set' ---
     if (subcommand === "set") {
-      // ... (this part is unchanged)
       const key = args[0];
       const modelName = args.slice(1).join(" ");
       if (key !== "model") {
@@ -254,9 +259,7 @@ const commands = {
       return;
     }
 
-    // =================================================================
-    // REWRITTEN SUBCOMMAND FOR LISTING MODELS FROM LOCAL FILE
-    // =================================================================
+
     if (subcommand === "list") {
       const listType = args[0];
       if (listType !== "models") {
@@ -302,20 +305,18 @@ const commands = {
       }
       return;
     }
-    // =================================================================
-    // END OF REWRITTEN SUBCOMMAND
-    // =================================================================
+
 
     // --- Default Case: Show help ---
     console.log(chalk.yellow.bold("\nConfig Command Usage:"));
     console.log(
-      "  config get                     - View the currently set model."
+      "  config get   - View the currently set model."
     );
     console.log(
       "  config set model <model_name>  - Set your default AI model."
     );
     console.log(
-      "  config list models             - Show recommended AI models and their capabilities."
+      "  config list models    - Show recommended AI models and their capabilities."
     );
     console.log(
       chalk.gray("\n  (Your API key is loaded securely from the .env file)")

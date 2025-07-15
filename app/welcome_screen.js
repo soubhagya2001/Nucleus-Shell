@@ -4,10 +4,10 @@ export default async function printWelcomeMessage() {
   console.clear();
 
   const banner = `
- Welcome to AI Shell!     
+ Welcome to Nucleus Shell!     
     Built with ❤️          
 
-[+] Booting Codecrafters Shell...
+[+] Booting Nucleus Shell...
 [+] Environment loaded
 [+] Awaiting your command, Operator 🧠
 
