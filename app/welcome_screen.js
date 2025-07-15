@@ -11,7 +11,6 @@ export default async function printWelcomeMessage() {
 [+] Environment loaded
 [+] Awaiting your command, Operator 🧠
 
-  ${chalk.cyanBright("Welcome to Codecrafters Shell! 🚀")}
   `;
 
   console.log(chalk.greenBright(banner));
