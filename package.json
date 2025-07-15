@@ -1,22 +1,28 @@
 {
-  "name": "@codecrafters/build-your-own-shell",
+  "name": "nucleus-shell",
   "version": "1.0.0",
-  "description": "Build your own Shell challenge, from CodeCrafters",
+  "description": "An AI-powered command-line shell using Google's Gemini.",
   "main": "main.js",
   "bin": {
-    "myshell": "./app/main.js"
+    "nucleus": "./app/main.js"
   },
   "type": "module",
   "scripts": {
+    "start": "node app/main.js",
     "dev": "node app/main.js"
   },
   "keywords": [
-    "build-your-own-x"
+    "shell",
+    "cli",
+    "terminal",
+    "ai",
+    "gemini",
+    "nodejs"
   ],
-  "author": "",
-  "license": "MIT",
+  "author": "soubhagya2001",
   "dependencies": {
     "@google/genai": "^1.8.0",
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.10.0",
     "boxen": "^8.0.1",
     "chalk": "^5.4.1",
